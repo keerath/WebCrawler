@@ -34,8 +34,13 @@ public class SlaveDownloader extends UntypedActor {
 			DownloadWork downloadWork = (DownloadWork) message;
 			String url = downloadWork.getUrl();
 			String month = downloadWork.getMonth();
-			MailInfo mailInfo;
-				mailInfo = extractMailInfo(url);
+			List<HtmlAnchor> linksPointingToMails = findLinksPointingToMails(url);
+			System.out.println("For Month "+month+" "+linksPointingToMails.size());
+			for (HtmlAnchor linkPointingToMail : linksPointingToMails ) {
+				
+				String mailUrl = url.substring(0,url.lastIndexOf('t'))+linkPointingToMail.getHrefAttribute();
+				MailInfo mailInfo;
+				mailInfo = extractMailInfo(mailUrl);
 				int x = writeMailInfo(mailInfo, month);
 				if (x == 0)
 					logger.info("[Mail Downloaded From: " + mailInfo.getFrom()
@@ -45,6 +50,7 @@ public class SlaveDownloader extends UntypedActor {
 							+ mailInfo.getFrom() + " could not be downloaded]");
 					System.out.println(x);
 				}
+			}
 			}
 		else {
 			logger.info("Invalid Message!");
@@ -81,4 +87,15 @@ public class SlaveDownloader extends UntypedActor {
 			return -1;
 		}
 	}
+	private List<HtmlAnchor> findLinksPointingToMails(String url)
+			throws FailingHttpStatusCodeException, MalformedURLException,
+			IOException {
+		HtmlPage currentPage = webClient.getPage(url);
+		List<HtmlAnchor> anchors = currentPage.getAnchors().stream()
+				.filter(anchor -> anchor.getHrefAttribute().charAt(0) == '%')
+				.collect(Collectors.toList());
+		webClient.close();
+		return anchors;
+	}
+	
 }

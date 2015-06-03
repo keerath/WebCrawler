@@ -27,14 +27,24 @@ import akka.routing.Router;
 public class MasterDownloader extends UntypedActor {
 
 	
-	private final ActorRef downloadRouter;
-	private final String yearForDownloadingMails = "2014";
+	
+	private final String year = "2014";
 	WebClient webClient = new WebClient();
 
 	public MasterDownloader() {
 
-		this.downloadRouter = this.context().actorOf(new RoundRobinPool(Runtime.getRuntime().availableProcessors() *4).props(Props.create(SlaveDownloader.class)));
 	}
+	Router router;
+	  {
+	    List<Routee> routees = new ArrayList<Routee>();
+	    for (int i = 0; i < Crawler.getUrlList().size() -1; i++) {
+	      ActorRef r = getContext().actorOf(Props.create(SlaveDownloader.class));
+	      getContext().watch(r);
+	      routees.add(new ActorRefRoutee(r));
+	    }
+	    router = new Router(new RoundRobinRoutingLogic(), routees);
+	  }
+
 	
 	static class Download {
 
@@ -60,28 +70,11 @@ public class MasterDownloader extends UntypedActor {
 					
 					new File(folderForMailDownloads + month).mkdir();
 				}
-					List<HtmlAnchor> anchors = findAnchorsOnPage(url);
-					System.out.println("For Month "+month+" "+anchors.size());
-					for (HtmlAnchor anchor : anchors) {
-						
-						String mailUrl = url.substring(0,url.lastIndexOf('t'))+anchor.getHrefAttribute();
-						downloadRouter.tell(new DownloadWork(mailUrl, month),
+					
+						router.route(new DownloadWork(url, month),
 								getSelf());
 				}
 			}
 			}
-		}
-		}
-	private List<HtmlAnchor> findAnchorsOnPage(String url)
-			throws FailingHttpStatusCodeException, MalformedURLException,
-			IOException {
-		HtmlPage currentPage = webClient.getPage(url);
-		List<HtmlAnchor> anchors = currentPage.getAnchors().stream()
-				.filter(anchor -> anchor.getHrefAttribute().charAt(0) == '%')
-				.collect(Collectors.toList());
-		webClient.close();
-		return anchors;
-	}
-
-		
+		}	
 }
