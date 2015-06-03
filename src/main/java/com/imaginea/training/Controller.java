@@ -14,7 +14,7 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 public class Controller {
 
 	public static void main(String args[]) throws Exception {
-		String crawlStorageFolder = "~/Desktop/Meta";
+		String crawlStorageFolder = "app-data/meta";
 		int numberOfCrawlers = 12;
 		CrawlConfig config = new CrawlConfig();
 		config.setCrawlStorageFolder(crawlStorageFolder);

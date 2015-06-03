@@ -42,12 +42,13 @@ public class Crawler extends WebCrawler {
 		String href = url.getURL().toLowerCase();
 		return !FILTERS.matcher(href).matches()
 				&& href.startsWith(baseUrl + yearForDownloadingMails)
-				&& href.contains("mbox/thread");
+				&& href.contains("mbox/thread") && !href.endsWith("?0");
 	}
 
 	@Override
 	public void visit(Page page) {
 		String url = page.getWebURL().getURL();
+		logger.info("Visiting :"+url);
 		if (!url.equals(baseUrl))
 			urlList.add(url);
 	}
