@@ -20,86 +20,77 @@ import com.gargoylesoftware.htmlunit.WebClient;
 
 public class MasterDownloader extends UntypedActor {
 
-  private final Logger logger = LoggerFactory.getLogger(MasterDownloader.class);
-  WebClient webClient = new WebClient();
-  private final long start = System.currentTimeMillis();
+    private final Logger logger = LoggerFactory.getLogger(MasterDownloader.class);
+    private final long start = System.currentTimeMillis();
+    private final String mailDownloadFolder = Constants.mailDownloadFolder;
+    private int numOfResults = 0;
+    private DecimalFormat formatter = new DecimalFormat("##.00");
 
-  private final String mailDownloadFolder = Constants.mailDownloadFolder;
-  private int numOfResults = 0;
-  private DecimalFormat formatter = new DecimalFormat("##.00");
+    public MasterDownloader() {
 
-  public MasterDownloader() {
-
-  }
-
-  Router downloadRouter;
-  
-  {
-    List<Routee> routees = new ArrayList<Routee>();
-    for (int i = 0; i < Crawler.getUrlList().size(); i++) {
-      ActorRef ref = getContext().actorOf(Props.create(SlaveDownloader.class));
-      getContext().watch(ref);
-      routees.add(new ActorRefRoutee(ref));
-    }
-    downloadRouter = new Router(new RoundRobinRoutingLogic(), routees);
-  }
-
-  static class Download {
-    private final List<String> urlList;
-
-    public List<String> getUrlList() {
-      return urlList;
     }
 
-    public Download(List<String> urlList) {
-      this.urlList = urlList;
-    }
-  }
+    Router downloadRouter;
 
-  @Override
-  public void onReceive(Object message) throws Exception {
-
-    if (message instanceof Download) {
-      String month;
-      Download totalDownloadWork = (Download) message;
-      List<String> urlList = totalDownloadWork.getUrlList();
-
-      for (int i = 0; i < urlList.size(); i++) {
-
-        String url = urlList.get(i);
-        if (url.endsWith("?0")) {
-          continue;
-        } else {
-          month = findMonth(url);
-          if (!url.contains("?")) {
-
-            new File(mailDownloadFolder + month).mkdir();
-          }
-          downloadRouter.route(new DownloadWork(url, month), getSelf());
+    {
+        List<Routee> routees = new ArrayList<Routee>();
+        for (int i = 0; i < Crawler.getUrlList().size(); i++) {
+            ActorRef ref = getContext().actorOf(Props.create(SlaveDownloader.class));
+            getContext().watch(ref);
+            routees.add(new ActorRefRoutee(ref));
         }
-      }
-    } else if (message instanceof SlaveDownloader.Terminate) {
-      numOfResults += 1;
-      if (numOfResults == Crawler.getUrlList().size()) {
-        long duration = System.currentTimeMillis() - start;
-
-        logger.info("Total Time To Download All Mails "
-            + formatter.format((duration / 1000.0) / 60.0) + " minutes");
-        getContext().stop(getSelf());
-        getContext().system().shutdown();
-      }
-    } else {
-      logger.info("Invalid Message!");
-      unhandled(message);
+        downloadRouter = new Router(new RoundRobinRoutingLogic(), routees);
     }
-  }
 
-  /**
-   * Extracts the month from a url.
-   * @param url URL of the page containing mails
-   * @return Month in which the mail was originated
-   */
-  public String findMonth(String url) {
-    return url.substring(url.lastIndexOf(".") - 2, url.lastIndexOf("."));
-  }
+    static class Download {
+        private final List<String> urlList;
+
+        public List<String> getUrlList() {
+            return urlList;
+        }
+
+        public Download(List<String> urlList) {
+            this.urlList = urlList;
+        }
+    }
+
+    @Override
+    public void onReceive(Object message) throws Exception {
+
+        if (message instanceof Download) {
+            String month;
+            Download totalDownloadWork = (Download) message;
+            List<String> fileList = totalDownloadWork.getUrlList();
+
+            for (int i = 0; i < fileList.size(); i++) {
+                String filePath = fileList.get(i);
+                month = findMonth(filePath);
+                new File(mailDownloadFolder + month).mkdir();
+                downloadRouter.route(new DownloadWork(filePath, month), getSelf());
+            }
+        } else if (message instanceof SlaveDownloader.Terminate) {
+            numOfResults += 1;
+            if (numOfResults == Crawler.getUrlList().size()) {
+                long duration = System.currentTimeMillis() - start;
+
+                logger.info("Total Time To Download All Mails "
+                        + formatter.format((duration / 1000.0) / 60.0) + " minutes");
+                getContext().stop(getSelf());
+                getContext().system().shutdown();
+            }
+        } else {
+            logger.info("Invalid Message!");
+            unhandled(message);
+        }
+    }
+
+    /**
+     * Extracts the month from a url.
+     *
+     * @param url URL of the page containing mails
+     * @return Month in which the mail was originated
+     */
+    public String findMonth(String url) {
+        return url.substring(url.lastIndexOf(".") - 2, url.lastIndexOf("."));
+    }
 }
